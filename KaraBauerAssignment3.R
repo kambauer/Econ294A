@@ -78,3 +78,7 @@ df.ex.6<-df.ex %>%
 select(state,starts_with("rw_"), count)
 df.ex.6max<-filter(df.ex.6, rw_mean==max(df.ex.6$rw_mean))
 print(df.ex.6max)
+
+#Question 7
+df.ex.7<-df.ex %>% arrange(year, month, desc(as.character(df$state)))
+
