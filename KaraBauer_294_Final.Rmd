@@ -1,0 +1,202 @@
+---
+title:"Econ 294A Final"
+author:"Kara Bauer"
+date:"March 16, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+knitr::opts_chunk$set(cache=TRUE)
+```
+```{r, pachage-load, echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(DBI)
+library(RSQLite)
+library("nycflights13")
+library(ggplot2)
+library(knitr)
+```
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+my_db<- src_sqlite("nycflights13", create=T)
+
+flights_sqlite <- tbl(my_db, "flights")
+weather_sqlite <- tbl(my_db, "weather")
+airports_sqlite <- tbl(my_db, "airports")
+planes_sqlite <- tbl(my_db, "planes")
+airlines_sqlite <-tbl(my_db, "airlines")
+
+flights=flights
+weather=weather
+airports=airports
+planes=planes
+airlines=airlines
+```
+```{r,echo=FALSE, warning=FALSE}
+flights_weather<-inner_join(
+  tbl(my_db,"flights"),
+  tbl(my_db,"weather"),
+  by = c("year","month","day","hour"))%>%
+  collect()%>%
+  mutate(canceled=(is.na(arr_time)),
+         delayed= ifelse(dep_delay>0,1,0))     
+
+flights_weather$month<-as.factor(flights_weather$month)
+
+
+flights_planes<-inner_join(
+  tbl(my_db,"flights"),
+  tbl(my_db,"planes"),
+  by = c("tailnum"))%>%
+  collect()%>%
+  mutate(canceled=(is.na(arr_time)),
+         delayed= ifelse(dep_delay>0,1,0)) 
+```
+## Part A
+```{r,echo=FALSE, warning=FALSE}
+probit_w<-glm(canceled~ temp+wind_speed+precip+pressure+visib, 
+              family=binomial(link="probit"), data=flights_weather)
+```
+```{r}
+summary(probit_w)
+```
+This probit regression shows that for canceled flights, temperature, pressure, and visibility are the most significant factors. 
+
+***
+```{r echo=FALSE, warning=FALSE}
+weather2<-subset(flights_weather, canceled==1)
+qplot(pressure, data=weather2, geom="density", fill=pressure, alpha=I(.5),
+      main="Distribution of Cancelations", xlab="Pressure",
+      ylab="Density")
+
+qplot(temp, data=weather2, geom="density", fill=temp, alpha=I(.5),
+      main="Distribution of Cancelations", xlab="Temperature",
+      ylab="Density")
+qplot(visib, data=weather2, geom="density", fill=visib, alpha=I(.5),
+      main="Distribution of Cancelations", xlab="Visibility",
+      ylab="Density")
+```
+
+These graphs show the distribution of the pressure, temperature, and visibility for cancelled flights. Interestingly, pressure has a normal distribution, which is centered between 1010 and 1020. The number of cancelations for temperature is skewed to the right with higher temperatures. The highest point is around 80 degrees. Then the density of visibility is very skewed to the right side where visibility is at level 10, which is poor visibilty. 
+
+***
+```{r echo=FALSE, warning=FALSE}
+can<-ggplot(
+  data=weather2,
+  aes(x=temp,y=pressure)) +  
+  geom_line(aes(color=visib)) 
+can
+```
+The graph shows the relationship between temperature and pressure of canceled flights and it also shows the varing visability. 
+
+***
+
+```{r echo=FALSE, warning=FALSE}
+probit_w_delayed<-glm(delayed~ temp+wind_speed+precip+pressure+visib, 
+              family=binomial(link="probit"), data=flights_weather)
+```
+```{r}
+summary(probit_w_delayed)
+```
+```{r echo=FALSE, warning=FALSE}
+weather3<-subset(flights_weather, delayed==1)
+
+qplot(visib, data=weather3, geom="density", fill=visib, alpha=I(.5),
+      main="Distribution of Departure Delays", xlab="Visibility",
+      ylab="Density")
+qplot(temp, data=weather3, geom="density", fill=temp, alpha=I(.5),
+      main="Distribution of Departure Delays", xlab="Temperature",
+      ylab="Density")
+qplot(pressure, data=weather3, geom="density", fill=pressure, alpha=I(.5),
+      main="Distribution of Departure Delays", xlab="Pressure",
+      ylab="Density")
+```
+
+The graphs here show visibility, temperature, and pressure again but for delayed flights. Visibility looks almost the same as before. Temperature has become less skewed and centered around 60 degrees. Pressure is normal and is centered around the same area as cancelations. 
+
+***
+```{r echo=FALSE, warning=FALSE}
+del<-ggplot(
+  data=weather3,
+  aes(x=temp,y=pressure)) +  
+  geom_line(aes(color=visib)) 
+del
+```
+The graph shows the relationship between temperature and pressure of delayed flights and it also shows the varing visability. 
+
+***
+***
+## Part B
+
+```{r echo=FALSE, warning=FALSE}
+probit_time<-glm(canceled~ day+month+hour, family=binomial(link="probit"), 
+                data=flights_weather)
+```
+```{r}
+summary(probit_time)
+```
+This table shows that hour and certain months are significant for canceled flights.
+
+***
+```{r echo=FALSE, warning=FALSE}
+qplot(hour, data=weather2, geom="density", fill=hour, alpha=I(.5),
+      main="Distribution of Cancelations", xlab="Hour",
+      ylab="Density")
+qplot(month, data=weather2, geom="density", fill=month, alpha=I(.5),
+      main="Distribution of Cancelations", xlab="month",
+      ylab="Density")
+```
+The first plot shows the distributions for cancelled flights by hour and then the second shows the distributions for each month. There is a spike in cancellations in month 1, January, probably from due to weather issues, or due an overflux of people from the holiday season. 
+
+***
+
+```{r echo=FALSE, warning=FALSE}
+qplot(hour, data=weather3, geom="density", fill=hour, alpha=I(.5),
+      main="Distribution of Departure Delays", xlab="Hour",
+      ylab="Density")
+qplot(month, data=weather3, geom="density", fill=month, alpha=I(.5),
+      main="Distribution of Departure Delays", xlab="month",
+      ylab="Density")
+```
+The same distribution graphs are made but for delayed flights. The most delayed flights occure around 7:30pm. Again, we see a spike in month 1 for the number of delayed flights. 
+
+***
+
+## Part C
+
+## Part D
+
+```{r echo=FALSE, warning=FALSE}
+probit_plane<-glm(canceled~type+manufacturer+engines+seats+engine,
+                  family=binomial(link="probit"), data=flights_planes)
+```
+
+```{r}
+summary(probit_plane)
+```
+Certain manufacturers are significant and seats are significant once I removed model type. I removed model type from this regression because the probit was taking a very long time to run. However, this explains why seats is significant
+***
+```{r echo=FALSE, warning=FALSE}
+planes2<-subset(flights_planes, canceled==1)
+qplot(canceled, data=planes2, geom="density", fill=engine, alpha=I(.5),
+      main="Distribution of Cancelations", xlab="Canceled Flights",
+      ylab="Density")
+qplot(canceled, data=planes2, geom="density", fill=manufacturer, alpha=I(.5),
+      main="Distribution of Cancelations", xlab="Canceled Flights",
+      ylab="Density")
+```
+The first graph shows the distribution of cancelled flights for engine type. Turbo-fan engines tend to be the most type of engine type that has cancelled flights. The second graph shows the distribution of manufacturers. Embraer shows to have the most cancelled flights. 
+
+***
+
+```{r echo=FALSE, warning=FALSE}
+qplot(delayed, data=planes2, geom="density", fill=engine, alpha=I(.5),
+      main="Distribution of Departure Delays", xlab="Canceled Flights",
+      ylab="Density")
+qplot(delayed, data=planes2, geom="density", fill=manufacturer, alpha=I(.5),
+      main="Distribution of Departure Delays", xlab="Canceled Flights",
+      ylab="Density")
+```
+These graphs show the distributions of delayed flights for engines and for manufacturer. Turbo-fan engines have the most delays and the manufacturer McDonnell Douglas has the most delays
+
+***
